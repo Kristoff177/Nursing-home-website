@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, Check, AlertCircle } from 'lucide-react';
+import { finalizeEntry } from '../services/database';
 import type { OptimizationResult } from '../types/documentation';
 
 interface OptimizationResultProps {
   result: OptimizationResult;
+  entryId: string | null;
   onSave: (editedText: string) => void;
-  onFinalizeExport: () => void;
+  onFinalizeExport: (finalText: string) => void;
   onBackToInput: () => void;
 }
 
 export default function OptimizationResultComponent({
   result,
+  entryId,
   onSave,
   onFinalizeExport,
   onBackToInput,
@@ -18,11 +21,35 @@ export default function OptimizationResultComponent({
   const [showOriginal, setShowOriginal] = useState(false);
   const [editedText, setEditedText] = useState(result.optimizedText);
   const [showSavedMessage, setShowSavedMessage] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
+  const [finalizeSuccess, setFinalizeSuccess] = useState(false);
 
   const handleSave = () => {
     onSave(editedText);
     setShowSavedMessage(true);
     setTimeout(() => setShowSavedMessage(false), 3000);
+  };
+
+  const handleFinalize = async () => {
+    if (!entryId) {
+      setFinalizeError('Kein Eintrag vorhanden.');
+      return;
+    }
+
+    setIsFinalizing(true);
+    setFinalizeError(null);
+
+    const finalized = await finalizeEntry(entryId, editedText);
+
+    if (finalized) {
+      setFinalizeSuccess(true);
+      onFinalizeExport(editedText);
+    } else {
+      setFinalizeError('Fehler beim Finalisieren des Eintrags.');
+    }
+
+    setIsFinalizing(false);
   };
 
   const valueIncrease = result.valueEstimate.value_after - result.valueEstimate.value_before;
@@ -104,18 +131,34 @@ export default function OptimizationResultComponent({
         </div>
       )}
 
+      {finalizeSuccess && (
+        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded">
+          <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <p className="text-sm text-green-700">Eintrag finalisiert. Datei bereit zum Download.</p>
+        </div>
+      )}
+
+      {finalizeError && (
+        <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700">{finalizeError}</p>
+        </div>
+      )}
+
       <div className="flex gap-3">
         <button
           onClick={handleSave}
-          className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded font-medium hover:bg-gray-50 transition-colors"
+          disabled={isFinalizing || finalizeSuccess}
+          className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded font-medium hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
         >
           Änderungen speichern
         </button>
         <button
-          onClick={onFinalizeExport}
-          className="flex-1 bg-green-600 text-white py-2 px-4 rounded font-medium hover:bg-green-700 transition-colors"
+          onClick={handleFinalize}
+          disabled={isFinalizing || finalizeSuccess}
+          className="flex-1 bg-green-600 text-white py-2 px-4 rounded font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
-          Finalisieren & Exportieren
+          {isFinalizing ? 'Finalisiere...' : 'Finalisieren & Exportieren'}
         </button>
       </div>
 
