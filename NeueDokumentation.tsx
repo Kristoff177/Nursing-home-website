@@ -3,7 +3,6 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { optimizeDocumentation, ApiTimeoutError, ApiError } from '../services/api';
 import { validateDocumentationText, validatePatientName } from '../utils/validation';
 import OptimizationResultComponent from '../components/OptimizationResult';
-import { createEntry, updateEntry } from '../services/database';
 import type { DocumentationEntry, OptimizationResult } from '../types/documentation';
 
 const MAX_TEXT_LENGTH = parseInt(
@@ -11,11 +10,7 @@ const MAX_TEXT_LENGTH = parseInt(
   10
 );
 
-interface NeueDokumentationProps {
-  onNavigateBack?: () => void;
-}
-
-export default function NeueDokumentation({ onNavigateBack }: NeueDokumentationProps) {
+export default function NeueDokumentation() {
   const [patientName, setPatientName] = useState('');
   const [mode, setMode] = useState<'manual' | 'dictation'>('manual');
   const [text, setText] = useState('');
@@ -25,7 +20,6 @@ export default function NeueDokumentation({ onNavigateBack }: NeueDokumentationP
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizationResult | null>(null);
-  const [entryId, setEntryId] = useState<string | null>(null);
 
   const handleTextChange = (value: string) => {
     setText(value);
@@ -69,18 +63,6 @@ export default function NeueDokumentation({ onNavigateBack }: NeueDokumentationP
     try {
       const optimizationResult = await optimizeDocumentation(entry);
       setResult(optimizationResult);
-
-      const savedEntry = await createEntry(
-        patientName.trim(),
-        mode,
-        text.trim(),
-        optimizationLevel,
-        optimizationResult
-      );
-
-      if (savedEntry) {
-        setEntryId(savedEntry.id!);
-      }
     } catch (err) {
       if (err instanceof ApiTimeoutError) {
         setError(err.message);
@@ -94,23 +76,17 @@ export default function NeueDokumentation({ onNavigateBack }: NeueDokumentationP
     }
   };
 
-  const handleSaveResult = async (editedText: string) => {
-    if (result && entryId) {
+  const handleSaveResult = (editedText: string) => {
+    if (result) {
       setResult({
         ...result,
         optimizedText: editedText,
       });
-
-      await updateEntry(entryId, {
-        optimized_text: editedText,
-      });
     }
   };
 
-  const handleFinalizeExport = (finalText: string) => {
-    if (entryId) {
-      console.log('Finalisieren mit ID:', entryId);
-    }
+  const handleFinalizeExport = () => {
+    console.log('Finalisieren & Exportieren wurde geklickt');
   };
 
   const handleBackToInput = () => {
@@ -123,17 +99,7 @@ export default function NeueDokumentation({ onNavigateBack }: NeueDokumentationP
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-4">
-          {onNavigateBack && (
-            <button
-              onClick={onNavigateBack}
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              ← Zurück
-            </button>
-          )}
-          <h1 className="text-xl font-semibold text-gray-900">Neue Dokumentation</h1>
-        </div>
+        <h1 className="text-xl font-semibold text-gray-900">Neue Dokumentation</h1>
       </header>
 
       <div className="max-w-7xl mx-auto p-6">
@@ -308,7 +274,6 @@ export default function NeueDokumentation({ onNavigateBack }: NeueDokumentationP
             {result && (
               <OptimizationResultComponent
                 result={result}
-                entryId={entryId}
                 onSave={handleSaveResult}
                 onFinalizeExport={handleFinalizeExport}
                 onBackToInput={handleBackToInput}
